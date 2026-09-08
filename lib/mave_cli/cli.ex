@@ -11,6 +11,7 @@ defmodule MaveCli.CLI do
     Sources,
     Upload,
     UploadToken,
+    Vimeo,
     Webhook
   }
 
@@ -27,6 +28,10 @@ defmodule MaveCli.CLI do
     per_page: :integer,
     uploaded: :boolean,
     collection: :string,
+    folder: :string,
+    dry_run: :boolean,
+    resume: :boolean,
+    state_file: :string,
     show_collections: :boolean,
     input_url: :string,
     name: :string,
@@ -63,7 +68,7 @@ defmodule MaveCli.CLI do
         0
 
       opts[:help] == true or positional == [] ->
-        IO.puts(help())
+        IO.puts(help(positional))
         0
 
       true ->
@@ -71,15 +76,57 @@ defmodule MaveCli.CLI do
     end
   end
 
-  defp execute(["auth", "login" | rest], opts) do
-    with {:ok, token} <- login_token(rest, opts),
-         :ok <- Config.save_token(token, base_url: opts[:base_url]) do
-      IO.puts("Mave token saved to #{Config.path()}")
-      0
-    else
-      {:error, reason} -> fail(reason)
+  defp execute([action | rest], opts) when action in ["login", "logout"],
+    do: execute(["auth", action | rest], opts)
+
+  defp execute(["import"], _opts) do
+    IO.puts(help(["import"]))
+    0
+  end
+
+  defp execute(["import", provider | _rest], _opts) when provider != "vimeo",
+    do:
+      fail("unknown importer #{inspect(provider)}; use `mave import` to see available importers")
+
+  defp execute(["import", "vimeo", action], _opts) when action in ["login", "logout", "status"] do
+    result =
+      case action do
+        "login" -> Vimeo.Auth.login()
+        "logout" -> Vimeo.Auth.logout()
+        "status" -> Vimeo.Auth.status()
+      end
+
+    case result do
+      {:ok, message} -> IO.puts(message) && 0
+      {:error, message} -> fail(message)
     end
   end
+
+  defp execute(["import", "vimeo", _action | _rest], _opts),
+    do: fail("usage: mave import vimeo [login | logout | status]; use --help for import options")
+
+  defp execute(["auth", "login" | rest], opts) when length(rest) <= 1 do
+    case Config.source(nil, base_url: opts[:base_url]) do
+      :config ->
+        IO.puts(
+          "Already logged in to this Mave server. Run `mave logout` before logging in again."
+        )
+
+        0
+
+      :environment ->
+        IO.puts(
+          "Already authenticated via MAVE_TOKEN. Unset MAVE_TOKEN before logging in with another account."
+        )
+
+        0
+
+      _ ->
+        login(rest, opts)
+    end
+  end
+
+  defp execute(["auth", "login" | _rest], _opts), do: fail("usage: mave login [TOKEN]")
 
   defp execute(["auth", "logout"], _opts) do
     case Config.delete_token() do
@@ -139,9 +186,18 @@ defmodule MaveCli.CLI do
          :ok <- Output.print(result, opts[:format] || "json") do
       0
     else
-      {:error, {:api, status, message}} -> fail("Mave API (HTTP #{status}): #{message}")
-      {:error, {:transport, message}} -> fail("network error: #{message}")
-      {:error, message} when is_binary(message) -> fail(message)
+      {:error, {:import, result}} ->
+        Output.print(result, opts[:format] || "json")
+        1
+
+      {:error, {:api, status, message}} ->
+        fail("Mave API (HTTP #{status}): #{message}")
+
+      {:error, {:transport, message}} ->
+        fail("network error: #{message}")
+
+      {:error, message} when is_binary(message) ->
+        fail(message)
     end
   end
 
@@ -156,6 +212,9 @@ defmodule MaveCli.CLI do
 
     Client.list_videos(client, query)
   end
+
+  defp dispatch(["import", "vimeo"], opts, client),
+    do: Vimeo.Import.run(client, opts)
 
   defp dispatch(["videos", "get", id], _opts, client), do: Client.get_video(client, id)
 
@@ -328,7 +387,17 @@ defmodule MaveCli.CLI do
   defp auth_status(:different_server), do: fail("stored token belongs to a different server")
 
   defp auth_status(:missing),
-    do: fail("no token found; use `mave auth login` or MAVE_TOKEN")
+    do: fail("no token found; use `mave login` or MAVE_TOKEN")
+
+  defp login(rest, opts) do
+    with {:ok, token} <- login_token(rest, opts),
+         :ok <- Config.save_token(token, base_url: opts[:base_url]) do
+      IO.puts("Mave token saved to #{Config.path()}")
+      0
+    else
+      {:error, reason} -> fail(reason)
+    end
+  end
 
   defp login_token([token], _opts), do: validate_token(token)
 
@@ -355,7 +424,7 @@ defmodule MaveCli.CLI do
     end
   end
 
-  defp login_token(_, _opts), do: {:error, "usage: mave auth login [TOKEN]"}
+  defp login_token(_, _opts), do: {:error, "usage: mave login [TOKEN]"}
 
   defp validate_token(token) do
     case String.trim(token) do
@@ -461,13 +530,79 @@ defmodule MaveCli.CLI do
     1
   end
 
-  defp help do
+  defp help(["import"]) do
+    """
+    Import videos into Mave from another platform.
+
+    Usage:
+      mave import PROVIDER [OPTIONS]
+
+    Available importers:
+      vimeo   Import videos with their titles and folder structure
+
+    Examples:
+      mave import vimeo --dry-run --format table
+      mave import vimeo --folder 12345
+
+    Run `mave import vimeo --help` for setup and all import options.
+    """
+  end
+
+  defp help(["import", "vimeo" | _rest]) do
+    """
+    Import Vimeo videos with their titles and folder structure, including subfolders.
+
+    Usage:
+      mave import vimeo [OPTIONS]
+
+    Setup:
+      Run `mave login` to select your Mave space.
+      Paste a token on your first import; it is saved locally for future imports.
+      VIMEO_ACCESS_TOKEN overrides the saved Vimeo token without being stored.
+      Create a token at https://developer.vimeo.com/apps with
+      Public, Private and Video Files access (Authenticated (you)).
+
+    Vimeo login:
+      mave import vimeo login     save a token before importing (optional)
+      mave import vimeo status    show the current Vimeo authentication source
+      mave import vimeo logout    remove the saved Vimeo token
+
+    Import options:
+      --folder ID          import this Vimeo folder and its descendants (default: all)
+      --collection ID      place imports inside an existing Mave collection
+      --dry-run            preview titles and folders without making changes
+      --resume             continue the same import using saved Mave IDs
+      --state-file FILE    choose where to save import progress
+      --wait               wait until each video is playable
+      --timeout SECONDS    maximum playback wait per video (default: 600)
+      --no-progress        hide progress messages
+      --format FORMAT      json (default) or table
+      --base-url URL       alternative Mave API base URL
+      --token TOKEN        override MAVE_TOKEN/stored Mave token
+
+    Examples:
+      mave import vimeo --dry-run --format table
+      mave import vimeo --folder 12345 --wait
+      mave import vimeo --folder 12345 --resume --wait
+
+    Without --wait, success means Mave accepted the import for processing.
+    Vimeo rate limits pause requests automatically; long cooldowns stop with retry guidance.
+    """
+  end
+
+  defp help(_command) do
     """
     mave #{MaveCli.version()} — command-line client for mave.io
 
     Usage:
+      mave login [TOKEN] [--no-browser]
+      mave logout
       mave auth login [TOKEN] [--no-browser]
       mave auth status | logout
+      mave import                         list available importers
+      mave import vimeo [--folder ID] [--collection ID] [--dry-run] [--resume]
+                       [--state-file FILE] [--wait] [--timeout SECONDS]
+      mave import vimeo login | status | logout
       mave videos list [--page N] [--per-page N] [--collection ID]
       mave videos get ID
       mave videos upload FILE_OR_URL [--collection ID] [--wait]
@@ -501,6 +636,8 @@ defmodule MaveCli.CLI do
           --timeout SECONDS    maximum wait time (default: 600)
       -h, --help               show this help
       -v, --version            show the version
+
+    Run `mave import vimeo --help` for Vimeo setup and import options.
     """
   end
 end

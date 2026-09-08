@@ -26,6 +26,10 @@ defmodule MaveCli.Output do
     do: {:error, "unknown output format: #{format} (use json or table)"}
 
   defp columns_for([%{"object" => "collection"} | _]), do: @collection_columns
+
+  defp columns_for([%{"object" => "vimeo_import_item"} | _]),
+    do: ["type", "vimeo_id", "name", "folder", "mave_id", "status", "error"]
+
   defp columns_for([%{"object" => "space"} | _]), do: @space_columns
   defp columns_for([row]) when is_map(row), do: row |> Map.keys() |> Enum.sort()
   defp columns_for(_), do: @video_columns

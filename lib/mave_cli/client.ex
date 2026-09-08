@@ -28,6 +28,11 @@ defmodule MaveCli.Client do
 
   def upload_key(%__MODULE__{upload_key: token}), do: token
 
+  def base_url(client), do: Req.Request.get_option(client.request, :base_url)
+
+  def without_retries(client),
+    do: %{client | request: Req.merge(client.request, retry: false)}
+
   def list_videos(client, query), do: request(client, :get, "videos", query: query)
   def get_video(client, id), do: request(client, :get, "videos/#{segment(id)}")
   def create_video(client, body), do: request(client, :post, "videos", body: body)
