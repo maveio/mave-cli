@@ -1,0 +1,44 @@
+class Mave < Formula
+  desc "Manage Mave videos, collections, and uploads from the command line"
+  homepage "https://github.com/maveio/mave-cli"
+  version "@VERSION@"
+  license "AGPL-3.0-or-later"
+
+  on_macos do
+    depends_on macos: :ventura
+    on_arm do
+      url "https://github.com/maveio/mave-cli/releases/download/v@VERSION@/mave-@VERSION@-macos_arm64.tar.gz"
+      sha256 "@MACOS_ARM64_SHA256@"
+    end
+    on_intel do
+      url "https://github.com/maveio/mave-cli/releases/download/v@VERSION@/mave-@VERSION@-macos_x86_64.tar.gz"
+      sha256 "@MACOS_X86_64_SHA256@"
+    end
+  end
+
+  on_linux do
+    on_arm do
+      url "https://github.com/maveio/mave-cli/releases/download/v@VERSION@/mave-@VERSION@-linux_arm64.tar.gz"
+      sha256 "@LINUX_ARM64_SHA256@"
+    end
+    on_intel do
+      url "https://github.com/maveio/mave-cli/releases/download/v@VERSION@/mave-@VERSION@-linux_x86_64.tar.gz"
+      sha256 "@LINUX_X86_64_SHA256@"
+    end
+  end
+
+  def install
+    bin.install "mave"
+    pkgshare.install "LICENSE", "licenses", "THIRD_PARTY_NOTICES.md", "build-info.json"
+  end
+
+  test do
+    ENV["MAVE_CONFIG_HOME"] = testpath/"config"
+    ENV.delete("MAVE_TOKEN")
+    assert_equal version.to_s, shell_output("#{bin}/mave --version").strip
+    assert_match "mave videos list", shell_output("#{bin}/mave --help")
+    result = JSON.parse(shell_output("#{bin}/mave upload-token test-subject --token test-secret"))
+    assert_equal "test-subject", result.fetch("subject")
+    assert_match "invalid option", shell_output("#{bin}/mave --invalid-option 2>&1", 1)
+  end
+end

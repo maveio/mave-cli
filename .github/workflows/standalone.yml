@@ -1,0 +1,132 @@
+name: Standalone packages
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: macos_arm64
+            runner: macos-15
+            container: ""
+          - target: macos_x86_64
+            runner: macos-15-intel
+            container: ""
+          - target: linux_arm64
+            runner: ubuntu-24.04-arm
+            container: "hexpm/elixir:1.20.4-erlang-29.0.6-ubuntu-jammy-20260810@sha256:8bc5e0e870361936b43ded6a5efb3934361672b8e5ccb3c69fad90e8a458d712"
+          - target: linux_x86_64
+            runner: ubuntu-24.04
+            container: "hexpm/elixir:1.20.4-erlang-29.0.6-ubuntu-jammy-20260810@sha256:8bc5e0e870361936b43ded6a5efb3934361672b8e5ccb3c69fad90e8a458d712"
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      MIX_ENV: prod
+      BURRITO_TARGET: ${{ matrix.target }}
+    steps:
+      - name: Install Linux build tools
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y autoconf make gcc g++ perl xz-utils binutils git curl ca-certificates
+      - uses: actions/checkout@v7
+      - name: Trust the checked-out workspace in the build container
+        if: runner.os == 'Linux'
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: actions/setup-python@v7
+        env:
+          # The container uses Ubuntu 22.04; do not reuse the host's 24.04 Python.
+          AGENT_TOOLSDIRECTORY: ${{ runner.temp }}/mave-python
+        with:
+          python-version: "3.13"
+      - uses: erlef/setup-beam@v1
+        if: runner.os == 'macOS'
+        with:
+          otp-version: "29.0.6"
+          elixir-version: "1.20.4"
+      - name: Install verified Zig compiler
+        run: python3 packaging/setup_zig.py --target "$BURRITO_TARGET" --output _build/standalone/zig
+      - name: Install macOS packaging tools
+        if: runner.os == 'macOS'
+        run: brew install xz
+      - uses: actions/cache/restore@v6
+        id: runtime-cache
+        with:
+          path: _build/standalone/runtime
+          key: runtime-${{ matrix.target }}-${{ matrix.runner }}-${{ hashFiles('packaging/runtime.lock.json', 'packaging/build_runtime.py') }}
+      - name: Build pinned runtime with static OpenSSL
+        run: |
+          python3 packaging/build_runtime.py --output _build/standalone/runtime --work _build/standalone/work --jobs 4
+          python3 packaging/verify_native.py _build/standalone/runtime/otp --target "$BURRITO_TARGET"
+      - uses: actions/cache/save@v6
+        if: steps.runtime-cache.outputs.cache-hit != 'true'
+        with:
+          path: _build/standalone/runtime
+          key: ${{ steps.runtime-cache.outputs.cache-primary-key }}
+      - run: mix local.hex --force
+      - run: mix deps.get --only prod --check-locked
+      - name: Build and package standalone binary
+        run: |
+          export BURRITO_CUSTOM_ERTS="$PWD/_build/standalone/runtime"
+          mix release --overwrite
+          python3 packaging/package.py archive --binary "burrito_out/mave_$BURRITO_TARGET" --runtime "$BURRITO_CUSTOM_ERTS" --target "$BURRITO_TARGET" --output _build/standalone/dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: standalone-${{ matrix.target }}
+          path: _build/standalone/dist/*
+          if-no-files-found: error
+
+  test:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: macos_arm64
+            runner: macos-15
+            container: ""
+          - target: macos_x86_64
+            runner: macos-15-intel
+            container: ""
+          - target: linux_arm64
+            runner: ubuntu-24.04-arm
+            container: "ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc"
+          - target: linux_x86_64
+            runner: ubuntu-24.04
+            container: "ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc"
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install test tools in a container without Erlang
+        if: runner.os == 'Linux'
+        run: |
+          apt-get update
+          apt-get install -y python3 git ca-certificates
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        if: runner.os == 'macOS'
+        with:
+          python-version: "3.13"
+      - uses: actions/download-artifact@v8
+        with:
+          name: standalone-${{ matrix.target }}
+          path: package
+      - name: Test the shipped executable
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          version=$(python3 -c 'import json, os; print(json.load(open("package/" + os.environ["TARGET"] + ".json"))["version"])')
+          tar -xzf "package/mave-$version-$TARGET.tar.gz" -C package
+          python3 packaging/smoke_test.py package/mave --version "$version"

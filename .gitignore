@@ -1,0 +1,11 @@
+/_build/
+/burrito_out/
+/cover/
+/deps/
+/doc/
+/erl_crash.dump
+/.elixir_ls/
+.DS_Store
+/.local/
+/tmp/
+__pycache__/

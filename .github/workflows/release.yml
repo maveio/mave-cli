@@ -1,0 +1,73 @@
+name: Prepare release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish the verified release (requires a matching version tag)"
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  standalone:
+    needs: checks
+    uses: ./.github/workflows/standalone.yml
+
+  prepare:
+    needs: standalone
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: standalone-*
+          path: packages
+      - name: Assemble verified release files
+        run: |
+          python3 packaging/package.py collect --input packages --output dist --require-clean
+          ruby -c dist/mave.rb
+      - name: Validate the publication tag and source
+        if: inputs.publish
+        env:
+          RELEASE_REF: ${{ github.ref }}
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          builds = json.load(open("dist/build-info.json"))
+          assert all(os.environ["RELEASE_REF"] == "refs/tags/v" + build["version"] for build in builds), "Select the matching version tag before publishing"
+          assert all(build["source_commit"] == os.environ["SOURCE_COMMIT"] for build in builds), "Source commit mismatch"
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-bundle
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    if: inputs.publish
+    needs: prepare
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-bundle
+          path: dist
+      - run: cd dist && sha256sum --check SHA256SUMS
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true

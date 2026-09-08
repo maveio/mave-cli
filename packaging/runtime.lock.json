@@ -1,0 +1,16 @@
+{
+  "otp": {
+    "version": "29.0.6",
+    "url": "https://github.com/erlang/otp/releases/download/OTP-29.0.6/otp_src_29.0.6.tar.gz",
+    "sha256": "36c89ffdac9d7531c19be0cee34355b167ea95188625d32bee61ebf49ac82afa"
+  },
+  "openssl": {
+    "version": "3.5.8",
+    "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.8/openssl-3.5.8.tar.gz",
+    "sha256": "a8f84a39918ec6415ce765d9b429d313ba97b8143169c172e734b9514464f5b2"
+  },
+  "elixir": "1.20.4",
+  "zig": "0.16.0",
+  "macos_minimum": "13.0",
+  "linux_glibc_maximum": "2.35"
+}
