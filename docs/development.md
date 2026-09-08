@@ -42,15 +42,30 @@ mix deps.get
 MIX_ENV=test mix run -e 'System.halt(MaveCli.CLI.run(System.argv()))' -- --help
 ```
 
-For the `mave` examples in the README, define this helper in your current shell
-from the repository directory:
+To run the checkout from the repository directory, define `mave-local` in your
+current shell. The installed `mave` executable continues to run its released
+version; local source changes appear only through this helper until rebuilt.
+
+Bash or Zsh:
 
 ```sh
-mave() {
+mave-local() {
   MIX_ENV=test mix run -e 'System.halt(MaveCli.CLI.run(System.argv()))' -- "$@"
 }
-mave auth login
+mave-local --help
 ```
+
+Fish:
+
+```fish
+function mave-local
+    env MIX_ENV=test mix run -e 'System.halt(MaveCli.CLI.run(System.argv()))' -- $argv
+end
+mave-local --help
+```
+
+Use `mave-local` instead of `mave` in the usage examples, for example
+`mave-local import vimeo --help`.
 
 Replace `--help` with a CLI command and its options, including
 [custom endpoints](usage.md#custom-endpoints) where needed. The test configuration

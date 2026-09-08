@@ -77,11 +77,10 @@ defmodule MaveCli.Config do
         {:ok, data["token"]}
 
       :missing ->
-        {:error, "no token found; use `mave auth login` or MAVE_TOKEN"}
+        {:error, "no token found; use `mave login` or MAVE_TOKEN"}
 
       :unbound ->
-        {:error,
-         "stored token is not bound to a server; run `mave auth login` again for this server"}
+        {:error, "stored token is not bound to a server; run `mave login` again for this server"}
 
       :different_server ->
         {:error,

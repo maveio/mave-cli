@@ -10,6 +10,9 @@
 A command-line client for [Mave](https://www.mave.io/). Manage videos and
 collections, upload files, and use JSON output in your scripts.
 
+Import videos from Vimeo with their titles and folder structure using
+[`mave import vimeo`](docs/usage.md#import-from-vimeo).
+
 ## Installation
 
 Install with Homebrew:
@@ -26,7 +29,7 @@ For running or building from source, see the [development guide](docs/developmen
 ## Get started
 
 ```sh
-mave auth login
+mave login
 mave videos list --format table
 mave videos upload ./video.mp4 --wait
 mave collections create --name "Product videos"
