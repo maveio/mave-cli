@@ -10,8 +10,9 @@
 A command-line client for [Mave](https://www.mave.io/). Manage videos and
 collections, upload files, and use JSON output in your scripts.
 
-Import videos from Vimeo with their titles and folder structure using
-[`mave import vimeo`](docs/usage.md#import-from-vimeo).
+The **experimental** [`mave import vimeo`](docs/usage.md#import-from-vimeo)
+imports videos with their titles and folder structure. Full live import
+verification is still pending.
 
 ## Installation
 
