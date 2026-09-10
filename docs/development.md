@@ -92,7 +92,7 @@ MIX_ENV=prod \
 BURRITO_TARGET=macos_arm64 \
 BURRITO_CUSTOM_ERTS="$PWD/_build/standalone/runtime" \
 mix release --overwrite
-python3 packaging/smoke_test.py burrito_out/mave_macos_arm64 --version 0.1.0
+python3 packaging/smoke_test.py burrito_out/mave_macos_arm64 --version 0.2.0
 ```
 
 Select the matching native target: `macos_arm64`, `macos_x86_64`, `linux_arm64`,
