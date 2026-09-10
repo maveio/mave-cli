@@ -12,6 +12,7 @@ defmodule MaveCli.Vimeo.Import do
   end
 
   def run_with_client(client, vimeo, opts \\ []) do
+    report(opts, "Experimental Vimeo importer: start with --dry-run and a small test folder.")
     report(opts, "Reading Vimeo videos and folders…")
 
     with :ok <- validate_options(opts),

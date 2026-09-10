@@ -538,7 +538,7 @@ defmodule MaveCli.CLI do
       mave import PROVIDER [OPTIONS]
 
     Available importers:
-      vimeo   Import videos with their titles and folder structure
+      vimeo   Import videos with their titles and folder structure (experimental)
 
     Examples:
       mave import vimeo --dry-run --format table
@@ -552,6 +552,9 @@ defmodule MaveCli.CLI do
     """
     Import Vimeo videos with their titles and folder structure, including subfolders.
 
+    Experimental: a complete live import has not yet been verified.
+    Start with --dry-run and a small test folder.
+
     Usage:
       mave import vimeo [OPTIONS]
 
@@ -561,6 +564,8 @@ defmodule MaveCli.CLI do
       VIMEO_ACCESS_TOKEN overrides the saved Vimeo token without being stored.
       Create a token at https://developer.vimeo.com/apps with
       Public, Private and Video Files access (Authenticated (you)).
+      Video file imports require Vimeo Standard, Advanced, Pro, Business, Premium or Enterprise.
+      Free accounts can preview titles and accessible folders with --dry-run.
 
     Vimeo login:
       mave import vimeo login     save a token before importing (optional)
@@ -601,7 +606,7 @@ defmodule MaveCli.CLI do
       mave auth status | logout
       mave import                         list available importers
       mave import vimeo [--folder ID] [--collection ID] [--dry-run] [--resume]
-                       [--state-file FILE] [--wait] [--timeout SECONDS]
+                       [--state-file FILE] [--wait] [--timeout SECONDS] (experimental)
       mave import vimeo login | status | logout
       mave videos list [--page N] [--per-page N] [--collection ID]
       mave videos get ID

@@ -83,6 +83,10 @@ Run `mave --help` to see all commands. JSON is the default output format; add `-
 
 ## Import from Vimeo
 
+**Experimental:** automated tests cover the importer using simulated Vimeo and
+Mave responses. A complete live import, including playable videos in Mave, has
+not yet been verified. Start with `--dry-run` and a small test folder.
+
 Import videos into the selected Mave space with their **titles and folder
 structure**, including subfolders and empty folders. The CLI sends video file
 links to Mave's existing import API; Mave fetches and processes the videos.
@@ -106,7 +110,9 @@ imports. Signing in to Vimeo in your browser does not authenticate
 the CLI. See [Vimeo's token setup guide](https://help.vimeo.com/hc/en-us/articles/12427789081745-How-to-generate-a-personal-access-token).
 
 For automation, set `VIMEO_ACCESS_TOKEN` instead. The token needs the `public`, `private`, and
-`video_files` scopes, plus a Vimeo plan that allows access to video file links.
+`video_files` scopes. Transferring video files requires a Vimeo **Standard,
+Advanced, Pro, Business, Premium, or Enterprise** plan; Free, Basic, Starter,
+and Plus do not provide the file-link access used by this importer.
 See [Vimeo's download-link documentation](https://help.vimeo.com/hc/en-us/articles/12427806914577-About-video-file-download-links-from-the-API).
 The Vimeo token is used only for Vimeo API requests. Tokens entered at the prompt
 are saved atomically with `0600` permissions on Unix, alongside the Mave login in
@@ -175,6 +181,19 @@ does not mean playback is ready. Use `--wait` to verify playback, or
 Unavailable videos are reported as `failed` while the remaining videos continue.
 The command exits with status `1` if any video failed. Progress goes to stderr,
 with results on stdout as JSON or `--format table`.
+
+### Testing without a paid Vimeo plan
+
+Vimeo's [general API is available on free accounts](https://help.vimeo.com/hc/en-us/articles/12427702473105-API-technical-and-developer-prerequisites).
+You can test login and `mave import vimeo --dry-run --format table` to check titles
+and the folders your account can access. The preview does not request video file
+links or submit videos, so a successful preview does not verify a full import.
+
+For complete verification, use a small folder in an eligible account, such as a
+customer's test folder, and a Mave test space. Include two short videos and a
+subfolder, import with `--folder ID --wait`, then check titles, nesting and playback.
+Repeat with the same folder and `--resume --wait` to confirm videos are not duplicated.
+The account owner can run these commands themselves without sharing their token.
 
 ### Resume state
 
